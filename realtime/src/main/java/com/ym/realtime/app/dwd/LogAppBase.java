@@ -1,6 +1,5 @@
 package com.ym.realtime.app.dwd;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONArray;
 import com.ym.realtime.utils.MyKafkaUtil;
@@ -39,10 +38,10 @@ public class LogAppBase {
         //1.1设置并行度 一般设置为kafka主题的分区数
         env.setParallelism(1);
         //1.2设置状态后端 测试存在hdfs
-        //env.setStateBackend(new FsStateBackend("hdfs://hadoop002:8020//gmall/dwd_log/ck"));
-        //1.3开启ck
-        //env.enableCheckpointing(10000L, CheckpointingMode.EXACTLY_ONCE);
-        //env.getCheckpointConfig().setCheckpointTimeout(60000L);
+        env.setStateBackend(new FsStateBackend("hdfs://hadoop002:8020//gmall/dwd_log/ck"));
+        //1.3开启ck 10秒钟开启一次ck
+        env.enableCheckpointing(10000L, CheckpointingMode.EXACTLY_ONCE);
+        env.getCheckpointConfig().setCheckpointTimeout(60000L); //超时时间1分钟
 
         //修改用户名
         System.setProperty("HADOOP_USER_NAME", "atguigu");
@@ -55,31 +54,32 @@ public class LogAppBase {
         SingleOutputStreamOperator<JSONObject> jsonObjDS = kafkaDS.map(data -> JSONObject.parseObject(data));
 
         //4.按mid分组
-        KeyedStream<JSONObject, String> keyedStream = jsonObjDS.keyBy(data -> data.getJSONObject("commom").getString("mid"));
+        KeyedStream<JSONObject, String> keyedStream = jsonObjDS.keyBy(data -> data.getJSONObject("common").getString("mid"));
 
         //5.使用状态做新老用户校验
         SingleOutputStreamOperator<JSONObject> jsonWithFlagDS = keyedStream.map(new NewMidRichMapFunc());
 
-        //打印测试  kafka  zk  hadoop
+        //打印测试  kafka  zk (hadoop)
+        // kafka生产者 bin/kafka-console-producer.sh --broker-list hadoop002:9092 --topic ods_base_log
+        //在生产者中输出两次  {"common":{"ar":"110000","ba":"iPhone","ch":"Appstore","is_new":"1","md":"iPhone Xs","mid":"mid_18","os":"iOS 13.3.1","uid":"23","vc":"v2.1.134"},"page":{"during_time":18188,"item":"1","item_type":"sku_ids","last_page_id":"trade","page_id":"payment"},"ts":1618801864000}
+        //is_new 会从 1 -> 0
         //jsonWithFlagDS.print();
 
         //6.分流,使用ProcessFunction将ODS数据分为启动、曝光、页面
         SingleOutputStreamOperator<String> pageDS = jsonWithFlagDS.process(new SplitProcessFunc());
 
         //7.将三个流分别写入到kafka的不同主题中
-        DataStream<String> startDS = pageDS.getSideOutput(new OutputTag<String>("start") {
-        });
-        DataStream<String> displayDS = pageDS.getSideOutput(new OutputTag<String>("display") {
-        });
+        DataStream<String> startDS = pageDS.getSideOutput(new OutputTag<String>("start") {});
+        DataStream<String> displayDS = pageDS.getSideOutput(new OutputTag<String>("display") {});
 
-        //打印测试
+        //打印测试 zk kafka log_mock nginx
         //pageDS.print("page>>>>");
         //startDS.print("start>>>");
         //displayDS.print("display>>>");
 
-        pageDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_PAGE));
-        startDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_START));
-        displayDS.addSink(MyKafkaUtil.getKafkaSink(Topic_DISPLAY));
+        pageDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_PAGE)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop002:9092 --from-beginning --topic dwd_page_log
+        startDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_START)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop002:9092 --from-beginning --topic dwd_start_log
+        displayDS.addSink(MyKafkaUtil.getKafkaSink(Topic_DISPLAY)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop002:9092 --from-beginning --topic dwd_display_log
 
         //8.执行任务
         env.execute();
@@ -117,7 +117,7 @@ public class LogAppBase {
                 //判断状态数据是否为null
                 if (firstData != null) {
                     //修复
-                    jsonObject.getJSONObject("commom").put("is_new", "0");
+                    jsonObject.getJSONObject("common").put("is_new", "0");
                 } else {
                     //更新状态
                     firstVisitDateState.update(simpleDateFormat.format(ts));
