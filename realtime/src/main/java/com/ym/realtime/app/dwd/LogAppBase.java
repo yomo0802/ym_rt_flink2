@@ -39,10 +39,10 @@ public class LogAppBase {
         //1.1设置并行度 一般设置为kafka主题的分区数
         env.setParallelism(1);
         //1.2设置状态后端 测试存在hdfs
-        env.setStateBackend(new FsStateBackend("hdfs://hadoop002:8020//gmall/dwd_log/ck"));
+        //env.setStateBackend(new FsStateBackend("hdfs://hadoop002:8020//gmall/dwd_log/ck"));
         //1.3开启ck 10秒钟开启一次ck
-        env.enableCheckpointing(10000L, CheckpointingMode.EXACTLY_ONCE);
-        env.getCheckpointConfig().setCheckpointTimeout(60000L); //超时时间1分钟
+        //env.enableCheckpointing(10000L, CheckpointingMode.EXACTLY_ONCE);
+        //env.getCheckpointConfig().setCheckpointTimeout(60000L); //超时时间1分钟
         //问题：开启checkpoint 如果有脏数据 任务会一直卡着 查询官网发现 默认重启策略是Integer的最大值 我们手动设置为不重启
         env.setRestartStrategy(RestartStrategies.noRestart());
         //一秒内重启三次
