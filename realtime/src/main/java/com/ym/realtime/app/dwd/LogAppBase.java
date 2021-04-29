@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONArray;
 import com.ym.realtime.utils.MyKafkaUtil;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
@@ -42,6 +43,10 @@ public class LogAppBase {
         //1.3开启ck 10秒钟开启一次ck
         env.enableCheckpointing(10000L, CheckpointingMode.EXACTLY_ONCE);
         env.getCheckpointConfig().setCheckpointTimeout(60000L); //超时时间1分钟
+        //问题：开启checkpoint 如果有脏数据 任务会一直卡着 查询官网发现 默认重启策略是Integer的最大值 我们手动设置为不重启
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        //一秒内重启三次
+        //env.setRestartStrategy(RestartStrategies.fixedDelayRestart(2,1000L));
 
         //修改用户名
         System.setProperty("HADOOP_USER_NAME", "atguigu");

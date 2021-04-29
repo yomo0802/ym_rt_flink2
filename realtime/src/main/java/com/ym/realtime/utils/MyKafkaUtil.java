@@ -3,7 +3,9 @@ package com.ym.realtime.utils;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
+import org.apache.flink.streaming.connectors.kafka.KafkaSerializationSchema;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
 
 import java.util.Properties;
 
@@ -15,6 +17,7 @@ public class MyKafkaUtil {
 
     private static String kafkaServer = "hadoop002:9092,hadoop003:9092,hadoop004:9092";
     private static Properties properties = new Properties();
+    private static String DEFAULT_TOPIC = "dwd_default_topic";
 
     static {
         properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer);
@@ -31,6 +34,12 @@ public class MyKafkaUtil {
     //将数据写入到kafka中
     public static FlinkKafkaProducer<String> getKafkaSink(String topic) {
         return new FlinkKafkaProducer<String>(topic, new SimpleStringSchema(), properties);
+    }
+
+    ////封装Kafka生产者  动态指定多个不同主题
+    public static <T>FlinkKafkaProducer<T> getKafkaSinkSchema(KafkaSerializationSchema<T> kafkaSerializationSchema) {
+        properties.setProperty(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, 5* 60 * 100 +"");
+        return new FlinkKafkaProducer<T>(DEFAULT_TOPIC,kafkaSerializationSchema,properties,FlinkKafkaProducer.Semantic.EXACTLY_ONCE);
     }
 
 }

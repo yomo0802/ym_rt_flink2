@@ -20,6 +20,7 @@
  * limitations under the License.
  */
 -->
+
 <configuration>
     <property>
         <name>hbase.rootdir</name>
@@ -35,6 +36,17 @@
         <name>hbase.zookeeper.quorum</name>
         <value>hadoop002,hadoop003,hadoop004</value>
     </property>
+
+    <property>
+        <name>hbase.unsafe.stream.capability.enforce</name>
+        <value>false</value>
+    </property>
+
+    <property>
+        <name>hbase.wal.provider</name>
+        <value>filesystem</value>
+    </property>
+
     <property>
         <name>phoenix.schema.isNamespaceMappingEnabled</name>
         <value>true</value>
@@ -45,4 +57,12 @@
         <value>true</value>
     </property>
 
+    <property>
+        <name>hbase.regionserver.wal.codec</name>
+        <value>org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec</value>
+        <description>二级索引支持</description>
+    </property>
+
+
 </configuration>
+
