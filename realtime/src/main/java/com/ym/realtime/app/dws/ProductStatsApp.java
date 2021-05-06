@@ -35,7 +35,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 
-/**
+/** 商品主题宽表 DateStream
  * Desc: 形成以商品为准的统计  曝光 点击  购物车  下单 支付  退单  评论数 宽表
  * <p>
  * mockLog -> Nginx -> Logger -> Kafka(ods_base_log) -> FlinkApp(BaseLogApp) -> Kafka(dwd_page_log)

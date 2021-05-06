@@ -10,7 +10,7 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
-/**
+/**     地区主题宽表 FlinkSQL方式 tableAPI
  * 	定义Table流环境
  * 	把数据源定义为动态表
  * 	通过SQL查询出结果表

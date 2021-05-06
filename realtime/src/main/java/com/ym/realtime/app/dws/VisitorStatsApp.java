@@ -23,7 +23,7 @@ import org.apache.flink.util.Collector;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 
-/**
+/**  访问主题宽表 DateStream
  * * Mock -> Nginx -> Logger ->
  * * Kafka(ods_base_log) ->
  * * FlinkApp(LogBaseApp) ->
