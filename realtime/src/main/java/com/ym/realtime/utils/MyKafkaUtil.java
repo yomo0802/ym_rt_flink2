@@ -42,4 +42,14 @@ public class MyKafkaUtil {
         return new FlinkKafkaProducer<T>(DEFAULT_TOPIC,kafkaSerializationSchema,properties,FlinkKafkaProducer.Semantic.EXACTLY_ONCE);
     }
 
+    public static String getKafkaDDL(String topic, String groupId) {
+        return "  'connector' = 'kafka'," +
+                "  'topic' = '" + topic + "'," +
+                "  'properties.bootstrap.servers' = '" + kafkaServer + "'," +
+                "  'properties.group.id' = '" + groupId + "'," +
+                "  'scan.startup.mode' = 'latest-offset'," +
+                "  'format' = 'json'" +
+                ")";
+    }
+
 }
