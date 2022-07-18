@@ -1,0 +1,9 @@
+7.7	定时器
+	基于处理时间或者时间时间处理过一个元素之后, 注册一个定时器, 然后指定的时间执行.
+	Context和OnTimerContext所持有的TimerService对象拥有以下方法:
+	currentProcessingTime(): Long 返回当前处理时间
+	currentWatermark(): Long 返回当前watermark的时间戳
+	registerProcessingTimeTimer(timestamp: Long): Unit 会注册当前key的processing time的定时器。当processing time到达定时时间时，触发timer。
+	registerEventTimeTimer(timestamp: Long): Unit 会注册当前key的event time 定时器。当水位线大于等于定时器注册的时间时，触发定时器执行回调函数。
+	deleteProcessingTimeTimer(timestamp: Long): Unit 删除之前注册处理时间定时器。如果没有这个时间戳的定时器，则不执行。
+	deleteEventTimeTimer(timestamp: Long): Unit 删除之前注册的事件时间定时器，如果没有此时间戳的定时器，则不执行。

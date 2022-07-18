@@ -75,6 +75,10 @@ public class ProvinceStatsSqlApp {
         rowDataStream.print();
 
         /**
+         *
+         * sudo systemctl start clickhouse-server
+         * clickhouse-client -m
+         *
          * 在ClickHouse中创建地区主题宽表
          * create table province_stats_200821 (
          *    stt DateTime,

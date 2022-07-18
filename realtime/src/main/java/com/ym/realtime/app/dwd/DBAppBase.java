@@ -1,11 +1,13 @@
 package com.ym.realtime.app.dwd;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.ym.realtime.app.funcs.DbSplitProcessFunction;
 import com.ym.realtime.app.funcs.DimSink;
 import com.ym.realtime.bean.TableProcess;
 import com.ym.realtime.utils.MyKafkaUtil;
 import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -26,61 +28,78 @@ import javax.annotation.Nullable;
  */
 public class DBAppBase {
     public static void main(String[] args) throws Exception {
+        //TODO 1.准备环境
+        //1.1 创建流处理执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        //1.2 设置并新度
         env.setParallelism(1);
-        env.enableCheckpointing(1000L, CheckpointingMode.EXACTLY_ONCE);
-        env.getCheckpointConfig().setCheckpointTimeout(60000L);
+        //1.3 开启Checkpoint，并设置相关的参数
+        //env.enableCheckpointing(5000, CheckpointingMode.EXACTLY_ONCE);
+        //env.getCheckpointConfig().setCheckpointTimeout(60000);
+        //env.setStateBackend(new FsStateBackend("hdfs://hadoop202:8020/gmall/checkpoint/basedbapp"));
+        //重启策略
+        // 如果说没有开启重启Checkpoint，那么重启策略就是noRestart
+        // 如果说没有开Checkpoint，那么重启策略会尝试自动帮你进行重启   重启Integer.MaxValue
+        //env.setRestartStrategy(RestartStrategies.noRestart());
 
-        //读取kafka数据
-        FlinkKafkaConsumer<String> kafkaSource = MyKafkaUtil.getKafkaSource("ods_base_db_m", "ods_base_db_m_groupId");
-        DataStreamSource<String> kafkaDS = env.addSource(kafkaSource);
+        //TODO 2.从Kafka的ODS层读取数据
+        String topic = "ods_fk_base_db_m";
+        String groupId = "ods_fk_base_db_m_groupId";
 
-        //将每行数据转换为json对象
-        SingleOutputStreamOperator<JSONObject> jsonObjDS = kafkaDS.map(data -> JSONObject.parseObject(data));
+        //2.1 通过工具类获取Kafka的消费者
+        FlinkKafkaConsumer<String> kafkaSource = MyKafkaUtil.getKafkaSource(topic, groupId);
+        DataStreamSource<String> jsonStrDS = env.addSource(kafkaSource);
 
-        //过滤出data字段数据 以及过滤出data数据不完整的数据
-        SingleOutputStreamOperator<JSONObject> filterDS = jsonObjDS.filter(new FilterFunction<JSONObject>() {
-            @Override
-            public boolean filter(JSONObject jsonObject) throws Exception {
-                //获取data字段
-                String data = jsonObject.getString("data");
-                return data != null && data.length() > 0;
-            }
-        });
+        //TODO 3.对DS中数据进行结构的转换      String-->Json
+        //jsonStrDS.map(JSON::parseObject);
+        SingleOutputStreamOperator<JSONObject> jsonObjDS = jsonStrDS.map(jsonStr -> JSON.parseObject(jsonStr));
+        //jsonStrDS.print("json>>>>");
 
-        //测试打印 zk kafka db_mock
-        //filterDS.print();
+        //TODO 4.对数据进行ETL   如果table为空 或者 data为空，或者长度<3  ，将这样的数据过滤掉
+        SingleOutputStreamOperator<JSONObject> filteredDS = jsonObjDS.filter(
+                jsonObj -> {
+                    boolean flag = jsonObj.getString("table") != null
+                            && jsonObj.getJSONObject("data") != null
+                            && jsonObj.getString("data").length() > 3;
+                    return flag;
+                }
+        );
 
-        //分流 ProcessFunction 维度数据放到HBase 中 事实数据放到kafka Dw层
-        //还可以动态的添加表 或字段
-        OutputTag<JSONObject> hbaseTag = new OutputTag<JSONObject>(TableProcess.SINK_TYPE_HBASE) {
-        };
-        SingleOutputStreamOperator<JSONObject> kafkaJsonDS = filterDS.process(new DbSplitProcessFunction(hbaseTag));
-        DataStream<JSONObject> hbaseJsonDS = kafkaJsonDS.getSideOutput(hbaseTag);
+        //filteredDS.print("json>>>>>");
 
-        //测试 zk kafka db_mock(在mysql中手动添加数据) HBase Phoenix HDFS maxwell
-        //hbaseJsonDS.print("HBASE>>>>>");
-        //kafkaJsonDS.print("KAFKA>>>>>");
+        //TODO 5. 动态分流  事实表放到主流，写回到kafka的DWD层；如果维度表，通过侧输出流，写入到Hbase
+        //5.1定义输出到Hbase的侧输出流标签
+        OutputTag<JSONObject> hbaseTag = new OutputTag<JSONObject>(TableProcess.SINK_TYPE_HBASE){};
 
-        //取出分流数据 写入HBase还是Kafka
-        hbaseJsonDS.addSink(new DimSink());
-        FlinkKafkaProducer<JSONObject> kafkaSinkSchema = MyKafkaUtil.getKafkaSinkSchema(new KafkaSerializationSchema<JSONObject>() {
+        //5.2 主流 写回到Kafka的数据
+        SingleOutputStreamOperator<JSONObject> kafkaDS = filteredDS.process(new DbSplitProcessFunction(hbaseTag));
 
-            @Override
-            public void open(SerializationSchema.InitializationContext context) throws Exception {
-                System.out.println("开始序列化kafka数据！");
-            }
+        //5.3获取侧输出流    写到Hbase的数据
+        DataStream<JSONObject> hbaseDS = kafkaDS.getSideOutput(hbaseTag);
 
-            //从每条数据得到该条数据应送往的主题名
-            @Override
-            public ProducerRecord<byte[], byte[]> serialize(JSONObject jsonObject, @Nullable Long aLong) {
-                return new ProducerRecord<byte[], byte[]>(jsonObject.getString("sink_table"), jsonObject.getString("data").getBytes());
-            }
-        });
-        //打印测试
-        hbaseJsonDS.print("hbase>>>>");
-        kafkaJsonDS.print("kafka>>>>");
-        kafkaJsonDS.addSink(kafkaSinkSchema);
+        kafkaDS.print("事实>>>>");
+        hbaseDS.print("维度>>>>");
+
+        //TODO 6.将维度数据保存到Phoenix对应的维度表中
+        hbaseDS.addSink(new DimSink());
+
+        //TODO 7.将事实数据写回到kafka的dwd层
+        FlinkKafkaProducer<JSONObject> kafkaSink = MyKafkaUtil.getKafkaSinkSchema(
+                new KafkaSerializationSchema<JSONObject>() {
+                    @Override
+                    public void open(SerializationSchema.InitializationContext context) throws Exception {
+                        System.out.println("kafka序列化");
+                    }
+                    @Override
+                    public ProducerRecord<byte[], byte[]> serialize(JSONObject jsonObj, @Nullable Long timestamp) {
+                        String sinkTopic = jsonObj.getString("sink_table");
+                        JSONObject dataJsonObj = jsonObj.getJSONObject("data");
+                        return new ProducerRecord<>(sinkTopic,dataJsonObj.toString().getBytes());
+                    }
+                }
+        );
+
+        kafkaDS.addSink(kafkaSink);
 
         env.execute();
     }

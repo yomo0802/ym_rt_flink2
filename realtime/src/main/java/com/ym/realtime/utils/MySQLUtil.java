@@ -33,7 +33,7 @@ public class MySQLUtil {
             Class.forName("com.mysql.jdbc.Driver");
 
             //2.获取连接
-            connection = DriverManager.getConnection("jdbc:mysql://hadoop002:3306/gmall2021_realtime?characterEncoding=utf-8&useSSL=false",
+            connection = DriverManager.getConnection("jdbc:mysql://hadoop102:3306/flink_process?characterEncoding=utf-8&useSSL=false",
                     "root",
                     "123456"
             );
@@ -109,7 +109,7 @@ public class MySQLUtil {
     }
 
     public static void main(String[] args) {
-        List<TableProcess> tableProcesses = queryList("select * from table_process", TableProcess.class, true);
+        List<TableProcess> tableProcesses = queryList("select * from flink_process.table_process", TableProcess.class, true);
 
         System.out.println(tableProcesses);
     }

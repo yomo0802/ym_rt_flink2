@@ -23,7 +23,7 @@ public class TableProcess {
     //输出表
     String sinkTable;
     //输出字段
-    String sinkColumn;
+    String sinkColumns;
     //主键字段
     String sinkPk;
     //建表扩展

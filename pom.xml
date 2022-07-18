@@ -11,7 +11,7 @@
     <modules>
         <module>realtime</module>
         <module>realtime</module>
+        <module>Flink_Stu</module>
     </modules>
-
 
 </project>

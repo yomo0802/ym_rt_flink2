@@ -1,0 +1,29 @@
+7.3.3	Flink中的WaterMark
+	支持event time的流式处理框架需要一种能够测量event time 进度的方式.比如, 一个窗口算子创建了一个长度为1小时的窗口,那么这个算子需要知道事件时间已经到达了这个窗口的关闭时间, 从而在程序中去关闭这个窗口.
+	事件时间可以不依赖处理时间来表示时间的进度.例如,在程序中,即使处理时间和事件时间有相同的速度, 事件时间可能会轻微的落后处理时间.
+	另外一方面,使用事件时间可以在几秒内处理已经缓存在Kafka中多周的数据, 这些数据可以照样被正确处理,就像实时发生的一样能够进入正确的窗口.
+	这种在Flink中去测量事件时间的进度的机制就是watermark(水印). watermark作为数据流的一部分在流动, 并且携带一个时间戳t.
+	一个Watermark(t)表示在这个流里面事件时间已经到了时间t, 意味着此时, 流中不应该存在这样的数据: 他的时间戳t2<=t (时间比较旧或者等于时间戳)
+7.3.4	Flink中如何产生水印
+	在 Flink 中,水印由应用程序开发人员生成,这通常需要对相应的领域有一定的了解。完美的水印永远不会错：时间戳小于水印标记时间的事件不会再出现。在特殊情况下（例如非乱序事件流）,最近一次事件的时间戳就可能是完美的水印。
+	启发式水印则相反,它只估计时间,因此有可能出错,即迟到的事件 （其时间戳小于水印标记时间）晚于水印出现。针对启发式水印,Flink 提供了处理迟到元素的机制。
+	设定水印通常需要用到领域知识。举例来说,如果知道事件的迟到时间不会超过 5 秒,就可以将水印标记时间设为收到的最大时间戳减去 5 秒.另 一种做法是,采用一个 Flink 作业监控事件流,学习事件的迟到规律,并以此构建水印生成模型。
+7.3.5	EventTime和WaterMark的使用
+    Flink内置了两个WaterMark生成器:
+        1.	Monotonously Increasing Timestamps(时间戳单调增长:其实就是允许的延迟为0)
+            WatermarkStrategy.forMonotonousTimestamps();
+        2.	Fixed Amount of Lateness(允许固定时间的延迟)
+            WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(10));
+7.3.6	自定义WatermarkStrategy
+	有2种风格的WaterMark生产方式: periodic(周期性) and punctuated(间歇性).都需要继承接口: WatermarkGenerator
+7.3.7	多并行度下WaterMark的传递
+    总结: 多并行度的条件下, 向下游传递WaterMark的时候, 总是以最小的那个WaterMark为准! 木桶原理!
+7.4	窗口允许迟到的数据
+	已经添加了wartemark之后, 仍有数据会迟到怎么办?  Flink的窗口, 也允许迟到数据.
+	当触发了窗口计算后, 会先计算当前的结果, 但是此时并不会关闭窗口.以后每来一条迟到数据, 则触发一次这条数据所在窗口计算(增量计算).
+	那么什么时候会真正的关闭窗口呢?  wartermark 超过了窗口结束时间+等待时间
+    .window(TumblingEventTimeWindows.of(Time.seconds(5)))
+    .allowedLateness(Time.seconds(3))
+    注意:
+        允许迟到只能运用在event time上
+

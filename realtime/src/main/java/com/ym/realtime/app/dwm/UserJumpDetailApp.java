@@ -52,9 +52,9 @@ public class UserJumpDetailApp {
         env.setParallelism(1);
 
         //TODO 1.从kafka的dwd_page_log主题中读取页面日志
-        String sourceTopic = "dwd_page_log";
+        String sourceTopic = "dwd_fk_page_log";
         String groupId = "userJumpDetailApp";
-        String sinkTopic = "dwm_user_jump_detail";
+        String sinkTopic = "dwm_fk_user_jump_detail";
 
         //TODO 从kafka中读取数据
         FlinkKafkaConsumer<String> kafkaSource = MyKafkaUtil.getKafkaSource(sourceTopic, groupId);

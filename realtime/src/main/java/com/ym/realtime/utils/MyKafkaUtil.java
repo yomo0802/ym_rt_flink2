@@ -15,7 +15,7 @@ import java.util.Properties;
  */
 public class MyKafkaUtil {
 
-    private static String kafkaServer = "hadoop002:9092,hadoop003:9092,hadoop004:9092";
+    private static String kafkaServer = "hadoop102:9092,hadoop103:9092,hadoop104:9092";
     private static Properties properties = new Properties();
     private static String DEFAULT_TOPIC = "dwd_default_topic";
 

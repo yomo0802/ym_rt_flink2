@@ -1,0 +1,39 @@
+7.8.7	状态后端
+	每传入一条数据，有状态的算子任务都会读取和更新状态。由于有效的状态访问对于处理数据的低延迟至关重要，因此每个并行任务(子任务)都会在本地维护其状态，以确保快速的状态访问。
+	状态的存储、访问以及维护，由一个可插入的组件决定，这个组件就叫做状态后端（state backend）
+	状态后端主要负责两件事：
+	本地的状态管理
+	将检查点（checkpoint）状态写入远程存储
+状态后端的分类
+	状态后端作为一个可插入的组件, 没有固定的配置, 我们可以根据需要选择一个合适的状态后端。
+	Flink提供了3中状态后端:
+	MemoryStateBackend
+	内存级别的状态后端,
+	存储方式:本地状态存储在JobManager的内存中, checkpoint 存储在JobManager的内存中。
+	特点:快速, 低延迟, 但不稳定
+	使用场景: 1. 本地测试 2. 几乎无状态的作业(ETL) 3. JobManager不容易挂, 或者挂了影响不大. 4. 不推荐在生产环境下使用
+	FsStateBackend
+	存储方式: 本地状态在JobManager内存, Checkpoint存储在文件系统中
+	特点: 拥有内存级别的本地访问速度, 和更好的容错保证
+	使用场景: 1. 常规使用状态的作业. 例如分钟级别窗口聚合, join等 2. 需要开启HA的作业 3. 可以应用在生产环境中
+	RocksDBStateBackend
+	将所有的状态序列化之后, 存入本地的RocksDB数据库中.(一种NoSql数据库, KV形式存储)
+	存储方式: 1. 本地状态存储在TaskManager的RocksDB数据库中(实际是内存+磁盘) 2. Checkpoint在外部文件系统中.
+	使用场景: 1. 超大状态的作业, 例如天级的窗口聚合 2. 需要开启HA的作业 3. 对读写状态性能要求不高的作业 4. 可以使用在生产环境
+配置状态后端
+	全局配置状态后端
+在flink-conf.yaml文件中设置默认的全局后端
+
+	在代码中配置状态后端
+可以在代码中单独为这个Job设置状态后端.
+env.setStateBackend(new MemoryStateBackend());
+env.setStateBackend(new FsStateBackend("hdfs://hadoop102:8020/flink/checkpoints/fs"));
+如何要使用RocksDBBackend, 需要先引入依赖:
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-statebackend-rocksdb_${scala.binary.version}</artifactId>
+    <version>${flink.version}</version>
+    <scope>provided</scope>
+</dependency>
+
+env.setStateBackend(new RocksDBStateBackend("hdfs://hadoop102:8020/flink/checkpoints/rocksdb"));

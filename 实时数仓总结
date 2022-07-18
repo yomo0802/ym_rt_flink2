@@ -1,0 +1,83 @@
+数仓分层
+    ods层 原始数据
+    dwd
+    dws
+    ads
+
+项目架构
+    日志数据 -> 日志服务器(Springboot) -> 落盘->kafka(ods_fk_base_log) -> Flink -> Clickhouse
+    业务数据 -> 业务服务器(Springboot) -> Mysql -> maxwell -> kafka(ods_fk_base_db_m) -> Flink -> Clickhouse
+
+---------------------ODS层----------------------
+日志采集
+    通过自己编写的Springboot程序将日志服务器上的日志采集到kafka的ods_fk_base_log主题并且落盘保留数据
+{"common":{"ar":"440000","ba":"iPhone","ch":"Appstore","is_new":"0","md":"iPhone Xs Max","mid":"mid_7","os":"iOS 13.2.3","uid":"25","vc":"v2.1.134"},"displays":[{"display_type":"activity","item":"2","item_type":"activity_id","order":1,"pos_id":2},{"display_type":"activity","item":"2","item_type":"activity_id","order":2,"pos_id":2},{"display_type":"query","item":"2","item_type":"sku_id","order":3,"pos_id":5},{"display_type":"promotion","item":"4","item_type":"sku_id","order":4,"pos_id":3},{"display_type":"query","item":"2","item_type":"sku_id","order":5,"pos_id":4},{"display_type":"query","item":"4","item_type":"sku_id","order":6,"pos_id":3},{"display_type":"query","item":"7","item_type":"sku_id","order":7,"pos_id":3},{"display_type":"recommend","item":"7","item_type":"sku_id","order":8,"pos_id":4}],"page":{"during_time":9102,"page_id":"home"},"ts":1644468956000}
+{"actions":[{"action_id":"favor_add","item":"1","item_type":"sku_id","ts":1644468957050},{"action_id":"get_coupon","item":"3","item_type":"coupon_id","ts":1644468958100}],"common":{"ar":"440000","ba":"iPhone","ch":"Appstore","is_new":"0","md":"iPhone Xs Max","mid":"mid_7","os":"iOS 13.2.3","uid":"25","vc":"v2.1.134"},"displays":[{"display_type":"promotion","item":"1","item_type":"sku_id","order":1,"pos_id":5},{"display_type":"query","item":"7","item_type":"sku_id","order":2,"pos_id":5},{"display_type":"query","item":"6","item_type":"sku_id","order":3,"pos_id":4},{"display_type":"query","item":"5","item_type":"sku_id","order":4,"pos_id":3}],"page":{"during_time":3151,"item":"1","item_type":"sku_id","last_page_id":"home","page_id":"good_detail","source_type":"query"},"ts":1644468956000}
+{"common":{"ar":"310000","ba":"iPhone","ch":"Appstore","is_new":"1","md":"iPhone X","mid":"mid_14","os":"iOS 13.3.1","uid":"20","vc":"v2.1.132"},"start":{"entry":"icon","loading_time":6288,"open_ad_id":6,"open_ad_ms":4765,"open_ad_skip_ms":4264},"ts":1644468949000}
+
+业务采集
+    业务服务器产生数据到Mysql的flink库中,采用maxwell将mysql的数据采集到kafka的ods_fk_base_db_m主题
+{"database":"flink","table":"comment_info","type":"insert","ts":1647838810,"xid":287,"commit":true,"data":{"id":1505771224195805228,"user_id":6381,"nick_name":null,"head_img":null,"sku_id":28,"spu_id":9,"order_id":38269,"appraise":"1204","comment_txt":"评论内容：13246875279414419141338394428732194618954964379918","create_time":"2022-02-10 13:00:08","operate_time":null}}
+
+
+-----------------------dwd层-------------------------
+日志数据
+    读取kafka的ods_fk_base_log主题数据
+    转换为jsonObj
+    按mid对数据 进行分组
+    根据is_new字段判断新老用户
+    进日志数据分流处理,分为页面、启动、曝光(分流处理采用了Flink的ProcessFunction函数)
+    最终将三个流写到kafka的不同主题(dwd_fk_start_log、dwd_fk_page_log、dwd_fk_display_log)
+
+业务数据
+    读取kafka的ods_fk_base_db_m主题的数据
+    转换为jsonObj
+    过滤出date字段,并将date字段不完整的数据清除
+    动态分流,将事实数据写入kafka的,将维度数据写入Hbase(添加一个动态建表功能)[这里还是利用了Flink的ProcessFunction函数]
+        自定义了两个函数
+            DbSplitProcessFunction()    分流处理
+            DimSink()   动态的在hbase建表 将维度数据写入Phoenix
+    在flink_process库中新建一个配置表
+    CREATE TABLE `table_process` (
+      `source_table` varchar(200) NOT NULL COMMENT '来源表',
+      `operate_type` varchar(200) NOT NULL COMMENT '操作类型 insert,update,delete',
+      `sink_type` varchar(200) DEFAULT NULL COMMENT '输出类型 hbase kafka',
+      `sink_table` varchar(200) DEFAULT NULL COMMENT '输出表(主题)',
+      `sink_columns` varchar(2000) DEFAULT NULL COMMENT '输出字段',
+      `sink_pk` varchar(200) DEFAULT NULL COMMENT '主键字段',
+      `sink_extend` varchar(200) DEFAULT NULL COMMENT '建表扩展',
+      PRIMARY KEY (`source_table`,`operate_type`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+
+
+----------------------------启动进程------------------------------------------
+=============== hadoop102 ===============
+6128 TaskManagerRunner
+2752 NameNode
+2100 QuorumPeerMain
+3029 NodeManager
+5304 Maxwell
+4216 SqlLine
+3784 HRegionServer
+5805 StandaloneSessionClusterEntrypoint
+3598 HMaster
+2878 DataNode
+=============== hadoop103 ===============
+2756 DataNode
+2054 QuorumPeerMain
+2952 NodeManager
+2825 ResourceManager
+2441 Kafka
+3497 HRegionServer
+=============== hadoop104 ===============
+2611 DataNode
+2787 SecondaryNameNode
+3097 HRegionServer
+2701 NodeManager
+2063 QuorumPeerMain
+
+
+
+
+
+

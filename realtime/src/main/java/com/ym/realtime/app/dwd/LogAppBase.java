@@ -29,9 +29,9 @@ import java.text.SimpleDateFormat;
 public class LogAppBase {
 
     //定义用户行为主题信息
-    public static final String TOPIC_START = "dwd_start_log";
-    public static final String TOPIC_PAGE = "dwd_page_log";
-    public static final String Topic_DISPLAY = "dwd_display_log";
+    public static final String TOPIC_START = "dwd_fk_start_log";
+    public static final String TOPIC_PAGE = "dwd_fk_page_log";
+    public static final String Topic_DISPLAY = "dwd_fk_display_log";
 
     public static void main(String[] args) throws Exception {
         //1.0获取执行环境
@@ -39,7 +39,7 @@ public class LogAppBase {
         //1.1设置并行度 一般设置为kafka主题的分区数
         env.setParallelism(1);
         //1.2设置状态后端 测试存在hdfs
-        //env.setStateBackend(new FsStateBackend("hdfs://hadoop002:8020//gmall/dwd_log/ck"));
+        //env.setStateBackend(new FsStateBackend("hdfs://hadoop102:8020//gmall_flink/dwd_log/ck"));
         //1.3开启ck 10秒钟开启一次ck
         //env.enableCheckpointing(10000L, CheckpointingMode.EXACTLY_ONCE);
         //env.getCheckpointConfig().setCheckpointTimeout(60000L); //超时时间1分钟
@@ -52,7 +52,7 @@ public class LogAppBase {
         System.setProperty("HADOOP_USER_NAME", "atguigu");
 
         //2.读取kafka ods_base_log 主题数据
-        FlinkKafkaConsumer<String> kafkaSource = MyKafkaUtil.getKafkaSource("ods_base_log", "ods_base_log_group");
+        FlinkKafkaConsumer<String> kafkaSource = MyKafkaUtil.getKafkaSource("ods_fk_base_log", "ods_fk_base_log_group");
         DataStreamSource<String> kafkaDS = env.addSource(kafkaSource);
 
         //3.将每行数据转化为jsonObj
@@ -65,7 +65,7 @@ public class LogAppBase {
         SingleOutputStreamOperator<JSONObject> jsonWithFlagDS = keyedStream.map(new NewMidRichMapFunc());
 
         //打印测试  kafka  zk (hadoop)
-        // kafka生产者 bin/kafka-console-producer.sh --broker-list hadoop002:9092 --topic ods_base_log
+        // kafka生产者 bin/kafka-console-producer.sh --broker-list hadoop102:9092 --topic ods_fk_base_log
         //在生产者中输出两次  {"common":{"ar":"110000","ba":"iPhone","ch":"Appstore","is_new":"1","md":"iPhone Xs","mid":"mid_18","os":"iOS 13.3.1","uid":"23","vc":"v2.1.134"},"page":{"during_time":18188,"item":"1","item_type":"sku_ids","last_page_id":"trade","page_id":"payment"},"ts":1618801864000}
         //is_new 会从 1 -> 0
         //jsonWithFlagDS.print();
@@ -82,9 +82,9 @@ public class LogAppBase {
         //startDS.print("start>>>");
         //displayDS.print("display>>>");
 
-        pageDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_PAGE)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop002:9092 --from-beginning --topic dwd_page_log
-        startDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_START)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop002:9092 --from-beginning --topic dwd_start_log
-        displayDS.addSink(MyKafkaUtil.getKafkaSink(Topic_DISPLAY)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop002:9092 --from-beginning --topic dwd_display_log
+        pageDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_PAGE)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop102:9092 --from-beginning --topic dwd_fk_page_log
+        startDS.addSink(MyKafkaUtil.getKafkaSink(TOPIC_START)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop102:9092 --from-beginning --topic dwd_fk_start_log
+        displayDS.addSink(MyKafkaUtil.getKafkaSink(Topic_DISPLAY)); //bin/kafka-console-consumer.sh --bootstrap-server hadoop102:9092 --from-beginning --topic dwd_fk_display_log
 
         //8.执行任务
         env.execute();
@@ -95,7 +95,7 @@ public class LogAppBase {
     /**
      * 使用状态做新老用户校验
      */
-    private static class NewMidRichMapFunc extends RichMapFunction<JSONObject, JSONObject> {
+    private static class  NewMidRichMapFunc extends RichMapFunction<JSONObject, JSONObject> {
 
         //声明状态 用于存放当前Mid是否已经访问过
         private ValueState<String> firstVisitDateState;

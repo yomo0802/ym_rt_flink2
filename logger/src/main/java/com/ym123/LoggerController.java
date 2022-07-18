@@ -24,7 +24,7 @@ public class LoggerController {
         //将数据落盘
         log.info(jsonStr);
         //将数据发送至Kafka ODS主题
-        kafkaTemplate.send("ods_base_log", jsonStr);
+        kafkaTemplate.send("ods_fk_base_log", jsonStr);
         return "success";
     }
 

@@ -1,0 +1,14 @@
+id=ws_001, ts=1577844001, vc=45
+id=ws_002, ts=1577844015, vc=43
+id=ws_003, ts=1577844020, vc=42
+
+
+    public static void main(String[] args) throws Exception {
+
+             // 1.流式数据处理环境
+             StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+             //3.执行
+             env.execute();
+
+         }
